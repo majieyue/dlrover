@@ -30,6 +30,10 @@ from dlrover.python.common.global_context import Context
 from dlrover.python.common.log import default_logger as logger
 from dlrover.python.common.node import Node, NodeGroupResource, NodeResource
 from dlrover.python.common.serialize import JsonSerializable
+from dlrover.python.master.resource.soft_group import (
+    SoftGroupSchedule,
+    resolve_soft_group_id,
+)
 from dlrover.python.master.resource.brain_optimizer import (
     BrainResoureOptimizer,
 )
@@ -324,6 +328,11 @@ class JobResource(JsonSerializable):
         # i.e. ``CONTIGUOUS`` behavior; set to a NodeGroupSchedule(strategy=
         # ep_pp_dp, ...) when the ep_pp_dp strategy is enabled and validated.
         self.node_group_schedule: Optional[NodeGroupSchedule] = None
+        # Soft group schedule (--soft-group-affinity, unequal group sizes),
+        # fully isolated from group_affinity / node_group_schedule above
+        # and mutually exclusive with them. When set, init_job_node_meta
+        # resolves worker groups with resolve_soft_group_id.
+        self.soft_group_schedule: Optional[SoftGroupSchedule] = None
 
     def get_node_group_resource(self, node_type):
         return self.node_group_resources.get(node_type, None)
@@ -385,7 +394,20 @@ class JobResource(JsonSerializable):
             group_nodes: Dict[int, Node] = {}
             group_size = self._group_count()
             for i in range(group_resource.count):
-                group_id = self._resolve_group_id(node_type, i)
+                if self.soft_group_schedule is not None:
+                    # --soft-group-affinity: unequal-size groups resolved
+                    # by the isolated soft resolver instead of the
+                    # group_affinity helpers above.
+                    group_id = resolve_soft_group_id(
+                        self.soft_group_schedule, node_type, i
+                    )
+                    group_size = (
+                        len(self.soft_group_schedule.sizes)
+                        if group_id is not None
+                        else None
+                    )
+                else:
+                    group_id = self._resolve_group_id(node_type, i)
                 group_nodes[i] = Node(
                     node_type=node_type,
                     node_id=i,
