@@ -248,12 +248,39 @@ class ValidateTopologyTest(unittest.TestCase):
         )
         self._assert_raises_msg(ga, sched, "N/G=6")
 
-    def test_non_contiguous_group_ids_fail(self):
-        ga = {0: 4, 1: 4, 3: 4}  # missing group id 2
+    def test_arbitrary_group_ids_accepted(self):
+        # Group ids are opaque: sparse/shifted ids are valid and the
+        # ascending id order defines the segment order. N=12, R=8, G=3,
+        # EP=8: dp_nodes=12, seg=4 -> slots 0/1/2 map to ids 0/1/3.
+        ga = {0: 4, 1: 4, 3: 4}  # missing group id 2, id 3 instead
         sched = _ep_pp_dp(
             tp=1, pp=1, ep=8, cp=1, num_nodes=12, ranks_per_node=8
         )
-        self._assert_raises_msg(ga, sched, "contiguous group ids")
+        validate_topology(ga, sched)
+        self.assertEqual(
+            [
+                resolve_group_id(ga, NodeType.WORKER, k, sched)
+                for k in range(12)
+            ],
+            [0] * 4 + [1] * 4 + [3] * 4,
+        )
+
+    def test_one_based_group_ids_stripe_like_zero_based(self):
+        # Production racks may be labeled from 1: {1: 4, 2: 4} must behave
+        # exactly like {0: 4, 1: 4} (N=8, R=8, PP=2, EP=16, G=2) — the ids
+        # only relabel the segments: ranks 0,1 -> 1; 2,3 -> 2; 4,5 -> 1;
+        # 6,7 -> 2 (PP/EP stay intra-segment, only DP crosses segments).
+        one_based = {1: 4, 2: 4}
+        zero_based = {0: 4, 1: 4}
+        sched = _ep_pp_dp(
+            tp=1, pp=2, ep=16, cp=1, num_nodes=8, ranks_per_node=8
+        )
+        validate_topology(one_based, sched)
+        for k in range(8):
+            self.assertEqual(
+                resolve_group_id(one_based, NodeType.WORKER, k, sched),
+                resolve_group_id(zero_based, NodeType.WORKER, k, sched) + 1,
+            )
 
 
 class StripeInvariantsTest(unittest.TestCase):
