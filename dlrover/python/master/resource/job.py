@@ -124,14 +124,19 @@ def _resolve_stripe_group_id(
         seg      = DP_nodes / G            # nodes per segment per stage
         group(k) = (k % DP_nodes) // seg
 
-    The caller is responsible for having validated the topology via
+    The group ids are opaque identifiers: the computed 0-based stripe slot
+    maps to the group with the k-th smallest id, mirroring the ascending-id
+    segment order used by the contiguous strategy. Ids like ``{1, 2}`` or
+    ``{5, 9, 17}`` are therefore as valid as ``{0, 1}``. The caller is
+    responsible for having validated the topology via
     :func:`validate_topology`, which guarantees the divisions are integral
     and ``seg >= 1``.
     """
     g = len(group_affinity)
+    ordered_groups = sorted(group_affinity.keys())
     dp_nodes = schedule.num_nodes // (schedule.tp * schedule.pp * schedule.cp)
     seg = dp_nodes // g
-    return (rank_index % dp_nodes) // seg
+    return ordered_groups[(rank_index % dp_nodes) // seg]
 
 
 def resolve_group_id(
@@ -152,7 +157,8 @@ def resolve_group_id(
       :func:`_resolve_stripe_group_id` is used instead. This requires a
       validated topology (see :func:`validate_topology`); as the topology
       is fixed-size, the rank is asserted to be within
-      ``schedule.num_nodes``.
+      ``schedule.num_nodes``. Group ids are opaque: they only label the
+      segments, with the ascending id order fixing the segment order.
 
     Returns ``None`` when group affinity is not configured or the rank
     falls outside the declared worker range. For ``ep_pp_dp``, an
@@ -201,8 +207,11 @@ def validate_topology(
       - C: ``S % EP == 0`` (an EP group does not cross a segment, which also
             makes ``de`` divisible across the ``G`` segments);
       - D: ``N % G == 0`` and all ``group_affinity`` values are equal to
-            ``N/G`` (equal-size groups, the platform hard requirement), and
-            the group ids are exactly ``{0, 1, ..., G-1}``;
+            ``N/G`` (equal-size groups, the platform hard requirement).
+            The group ids are opaque identifiers — the ascending id order
+            defines the segment order (the k-th stripe slot maps to the
+            k-th smallest id), so e.g. ``{1: 4, 2: 4}`` is as valid as
+            ``{0: 4, 1: 4}``;
       - E: ``EP % R == 0`` (an EP group is composed of whole nodes);
       - implicit: ``dense_dp`` and ``dp_nodes`` are integral and ``seg >= 1``.
     """
@@ -289,7 +298,9 @@ def validate_topology(
             "group spans whole nodes."
         )
 
-    # Constraint D: equal-size groups, group ids == {0..G-1}, each == N/G.
+    # Constraint D: equal-size groups, each == N/G. Group ids are opaque
+    # identifiers (distinct keys of the dict); their ascending order fixes
+    # the segment order, so no 0-based contiguity is required.
     if n % g != 0:
         raise ValueError(
             "node-group-strategy=ep_pp_dp requires the worker node count "
@@ -302,12 +313,6 @@ def validate_topology(
         raise ValueError(
             "node-group-strategy=ep_pp_dp requires all group_affinity sizes "
             f"to be equal to N/G={expected_size}, got {equal_size}."
-        )
-    keys = sorted(group_affinity.keys())
-    if keys != list(range(g)):
-        raise ValueError(
-            "node-group-strategy=ep_pp_dp requires contiguous group ids "
-            f"{{0,1,...,{g - 1}}}, got {keys}."
         )
 
 
