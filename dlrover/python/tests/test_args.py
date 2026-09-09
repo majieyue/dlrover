@@ -135,6 +135,36 @@ class ArgsTest(unittest.TestCase):
         parsed_args = parse_master_args(original_args)
         self.assertEqual(parsed_args.group_affinity, {2: 3})
 
+    def test_parse_soft_group_args(self):
+        # defaults: no soft mapping, the failover flag off
+        parsed_args = parse_master_args(["--job_name", "test"])
+        self.assertIsNone(parsed_args.soft_group_affinity)
+        self.assertFalse(parsed_args.no_group_failover)
+
+        # soft group affinity reuses the dict parser (unequal sizes)
+        parsed_args = parse_master_args(
+            [
+                "--job_name",
+                "test",
+                "--soft-group-affinity={0: 30, 1: 20}",
+                "--no-group-failover",
+            ]
+        )
+        self.assertEqual(parsed_args.soft_group_affinity, {0: 30, 1: 20})
+        self.assertTrue(parsed_args.no_group_failover)
+
+        # the underscore aliases are also accepted
+        parsed_args = parse_master_args(
+            [
+                "--job_name",
+                "test",
+                "--soft_group_affinity={2: 3}",
+                "--no_group_failover",
+            ]
+        )
+        self.assertEqual(parsed_args.soft_group_affinity, {2: 3})
+        self.assertTrue(parsed_args.no_group_failover)
+
         # invalid mapping makes the parser exit with code 2
         original_args = [
             "--job_name",

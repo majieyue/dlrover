@@ -121,6 +121,16 @@ class JobArgs(JsonSerializable):
         self.pipeline_model_parallel_size: int = 1
         self.expert_model_parallel_size: int = 1
         self.context_parallel_size: int = 1
+        # Unequal-size node group pod counts (--soft-group-affinity),
+        # fully isolated from group_affinity above and mutually exclusive
+        # with it. See SoftGroupSchedule / validate_soft_group_topology /
+        # resolve_soft_group_id in master.resource.soft_group. Every group
+        # size must be a multiple of the EP slot (EP/R pods) — the EP
+        # alignment is mandatory, not an option.
+        self.soft_group_affinity: Optional[Dict[int, int]] = None
+        # With soft_group_affinity: relaunch (FO) workers without their
+        # node-group labels so they can be scheduled onto any segment.
+        self.no_group_failover: bool = False
 
     @abstractmethod
     def initilize(self):

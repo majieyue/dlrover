@@ -203,6 +203,29 @@ def _build_master_args_parser():
         help="Context-parallel size. Only consulted (and required to be 1) "
         "when --node-group-strategy=ep_pp_dp.",
     )
+    parser.add_argument(
+        "--soft-group-affinity",
+        "--soft_group_affinity",
+        default=None,
+        type=parse_group_affinity,
+        help="Unequal-size node group pod counts, e.g. "
+        '--soft-group-affinity="{0: 30, 1: 20}" means group 0 schedules '
+        "30 pods and group 1 schedules 20 pods. Unlike --group-affinity "
+        "the sizes may be heterogeneous, enabling --node-group-strategy "
+        "placement over uneven segments. The worker replicas must equal "
+        "the sum of all group sizes. Mutually exclusive with "
+        "--group-affinity.",
+    )
+    parser.add_argument(
+        "--no-group-failover",
+        "--no_group_failover",
+        action="store_true",
+        default=False,
+        help="With --soft-group-affinity: drop the node-group labels of "
+        "a relaunched (failover) worker pod so it can be scheduled onto "
+        "any segment. Defaults to false, i.e. the relaunch keeps its "
+        "group and follows the original segment affinity.",
+    )
     return parser
 
 
