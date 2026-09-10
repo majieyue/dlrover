@@ -263,6 +263,300 @@ class ResolveSoftGroupIdTest(unittest.TestCase):
         )
         self.assertTrue(any("crossing groups" in log for log in logs.output))
 
+    def test_ep_pp_dp_unequal_sizes_per_stage_rotation(self):
+        # The ep_pp_dp rotation RESETS at every pipeline stage (virtual
+        # group) boundary instead of running globally: with sizes
+        # {1:4, 2:2, 3:2}, pp=2, ep_workers=2 the layout matches the
+        # requested segment placement — SG1 keeps its PP column
+        # intra-group (pods 0,1 <-> 4,5), and ONLY the odd-slot groups
+        # SG2/SG3 pair across stages (unavoidable with 1 slot each).
+        schedule = _soft(
+            strategy=NodeGroupStrategy.EP_PP_DP,
+            sizes={1: 4, 2: 2, 3: 2},
+            pp=2,
+            ep=16,
+        )
+        validate_soft_group_topology(schedule)
+        layout = [
+            resolve_soft_group_id(schedule, NodeType.WORKER, k)
+            for k in range(8)
+        ]
+        # stage 0 = [1,1, 2,2], stage 1 = [1,1, 3,3]
+        self.assertEqual(layout, [1, 1, 2, 2, 1, 1, 3, 3])
+        self.assertEqual([k for k in range(8) if layout[k] == 1], [0, 1, 4, 5])
+        self.assertEqual([k for k in range(8) if layout[k] == 2], [2, 3])
+        self.assertEqual([k for k in range(8) if layout[k] == 3], [6, 7])
+        # PP column alignment: same within-stage position maps to the
+        # same group except the odd-slot SG2/SG3 pair.
+        dp_nodes, pp = 4, 2
+        straddled = [
+            p
+            for p in range(dp_nodes)
+            if layout[p] != layout[pp * dp_nodes // 2 + p]
+        ]
+        self.assertEqual(straddled, [2, 3])
+        # All EP slots stay intra-group.
+        for start in range(0, 8, 2):
+            self.assertEqual(len(set(layout[start : start + 2])), 1)
+
+    def test_ep_pp_dp_greedy_column_packing_never_starves(self):
+        # {g1: 6, g2: 2, g3: 2} with 1-pod EP slots starves a per-stage
+        # round robin (the small groups drain in stage 0 and stage 1
+        # cannot be filled); the greedy column packing lays the world
+        # out fully: each pair of same-position slots forms a column
+        # owned by ONE group, so every PP column stays intra-group.
+        schedule = _soft(
+            strategy=NodeGroupStrategy.EP_PP_DP,
+            sizes={1: 6, 2: 2, 3: 2},
+            pp=2,
+            ep=8,
+        )
+        validate_soft_group_topology(schedule)
+        layout = [
+            resolve_soft_group_id(schedule, NodeType.WORKER, k)
+            for k in range(10)
+        ]
+        self.assertEqual(layout, [1, 1, 1, 2, 3, 1, 1, 1, 2, 3])
+        # columns: [1,1],[1,1],[1,1],[2,2],[3,3] -> column s-th slots
+        dp_nodes, pp = 5, 2
+        for position in range(dp_nodes):
+            self.assertEqual(
+                layout[position], layout[pp * 0 + dp_nodes + position]
+            )
+
+    def _check_scenario(
+        self,
+        sizes,
+        pp,
+        ep,
+        expected_layout,
+        mixed_columns,
+        ranks_per_node=8,
+    ):
+        """Assert a full ep_pp_dp scenario: the greedy column packing
+        produces exactly ``expected_layout`` (verified against the real
+        implementation), every group hosts its declared pod count, every
+        EP slot stays inside ONE group, and the number of PP columns
+        mixing two groups matches the theoretical minimum
+        (``ceil(odd_slot_groups / 2)`` plateaus) given by
+        ``mixed_columns`` (None skips the mixed-count assertion)."""
+        schedule = _soft(
+            strategy=NodeGroupStrategy.EP_PP_DP,
+            sizes=sizes,
+            pp=pp,
+            ep=ep,
+            ranks_per_node=ranks_per_node,
+        )
+        validate_soft_group_topology(schedule)
+        total = sum(sizes.values())
+        layout = [
+            resolve_soft_group_id(schedule, NodeType.WORKER, rank)
+            for rank in range(total)
+        ]
+        self.assertEqual(layout, expected_layout)
+        # every group keeps exactly its declared pod count
+        for group_id, size in sizes.items():
+            self.assertEqual(layout.count(group_id), size)
+        slot = ep // ranks_per_node
+        dp_nodes = total // pp
+        ep_groups = dp_nodes // slot
+        # every EP slot is single-group (never straddles a segment)
+        for stage in range(pp):
+            for de in range(ep_groups):
+                pods = [stage * dp_nodes + de * slot + i for i in range(slot)]
+                self.assertEqual(
+                    len({layout[p] for p in pods}),
+                    1,
+                    f"EP(s={stage}, de={de}) pods {pods} straddle",
+                )
+        if mixed_columns is None:
+            return
+        # compute the theoretical minimum of mixed PP columns
+        odd_slot_groups = sum(
+            1 for size in sizes.values() if (size // slot) % pp != 0
+        )
+        self.assertLessEqual(
+            mixed_columns,
+            (odd_slot_groups + 1) // 2,
+            "greedy column packing pays more mixed columns than the "
+            "pairing lower bound",
+        )
+        actual_mixed = 0
+        for de in range(ep_groups):
+            if any(
+                layout[stage * dp_nodes + de * slot]
+                != layout[(stage + 1) * dp_nodes + de * slot]
+                for stage in range(pp - 1)
+            ):
+                actual_mixed += 1
+        self.assertEqual(actual_mixed, mixed_columns)
+
+    def test_ep_pp_dp_scenario_matrix_legal(self):
+        # A spectrum of legal topologies: single group, equal sizes,
+        # unequal multiples of 4, pp=4, four segments, 1-pod slots...
+        # (expected layouts verified against the real implementation).
+        self._check_scenario(
+            sizes={7: 8},
+            pp=2,
+            ep=16,
+            expected_layout=[7] * 8,
+            mixed_columns=0,
+        )
+        self._check_scenario(
+            sizes={1: 2, 2: 2},
+            pp=2,
+            ep=8,
+            expected_layout=[1, 2, 1, 2],
+            mixed_columns=0,
+        )
+        self._check_scenario(
+            sizes={1: 8, 2: 8},
+            pp=2,
+            ep=16,
+            expected_layout=[1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2],
+            mixed_columns=0,
+        )
+        self._check_scenario(
+            sizes={1: 8, 2: 4},
+            pp=2,
+            ep=16,
+            expected_layout=[1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2],
+            mixed_columns=0,
+        )
+        self._check_scenario(
+            sizes={1: 8, 2: 4, 3: 4},
+            pp=4,
+            ep=8,
+            expected_layout=[1, 1, 2, 3, 1, 1, 2, 3, 1, 1, 2, 3, 1, 1, 2, 3],
+            mixed_columns=0,
+        )
+        self._check_scenario(
+            sizes={1: 2, 2: 2, 3: 2, 4: 2},
+            pp=2,
+            ep=8,
+            expected_layout=[1, 2, 3, 4, 1, 2, 3, 4],
+            mixed_columns=0,
+        )
+        self._check_scenario(
+            sizes={1: 12, 2: 8, 3: 8},
+            pp=2,
+            ep=16,
+            expected_layout=[
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                3,
+                3,
+                1,
+                1,
+                2,
+                2,
+                3,
+                3,
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                3,
+                3,
+                1,
+                1,
+                2,
+                2,
+                3,
+                3,
+            ],
+            mixed_columns=0,
+        )
+        # two odd-slot groups: the two residual EP slots pair in ONE
+        # mixed column (the theoretical minimum).
+        self._check_scenario(
+            sizes={1: 6, 2: 6, 3: 4},
+            pp=2,
+            ep=16,
+            expected_layout=[1, 1, 2, 2, 3, 3, 1, 1, 1, 1, 2, 2, 3, 3, 2, 2],
+            mixed_columns=1,
+        )
+        # the user-provided S2/S3 shapes
+        self._check_scenario(
+            sizes={1: 4, 2: 2, 3: 2},
+            pp=2,
+            ep=16,
+            expected_layout=[1, 1, 2, 2, 1, 1, 3, 3],
+            mixed_columns=1,
+        )
+        self._check_scenario(
+            sizes={1: 6, 2: 4, 3: 2},
+            pp=2,
+            ep=16,
+            expected_layout=[1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 3, 3],
+            mixed_columns=1,
+        )
+        # the fragment-pairing minimum with 1-pod EP slots: the three
+        # whole columns and the two 1-slot residual fragments pair up
+        # in the last column — ONE mixed column (a descending chained
+        # fill pays two).
+        self._check_scenario(
+            sizes={1: 3, 2: 3, 3: 2},
+            pp=2,
+            ep=8,
+            expected_layout=[1, 2, 3, 1, 1, 2, 3, 2],
+            mixed_columns=1,
+        )
+        # the starvation counter-example with 1-pod slots: a per-stage
+        # round robin drains the small groups in stage 0; the greedy
+        # column packing lays the world out fully.
+        self._check_scenario(
+            sizes={1: 6, 2: 2, 3: 2},
+            pp=2,
+            ep=8,
+            expected_layout=[1, 1, 1, 2, 3, 1, 1, 1, 2, 3],
+            mixed_columns=0,
+        )
+
+    def test_ep_pp_dp_scenario_matrix_invalid(self):
+        # A spectrum of illegal topologies rejected by the start-up
+        # validation, each failing fast with its own message.
+        invalid_cases = [
+            # dense_dp = 10*8/2 = 40 not divisible by EP=16 (N must be
+            # a multiple of 4 for pp=2, ep=16, R=8)
+            ({1: 6, 2: 2, 3: 2}, 2, 16, "divisible by EP"),
+            # group 1 has 3 pods, not a multiple of the EP slot (2)
+            ({1: 3, 2: 3, 3: 2}, 2, 16, "ep_workers=2"),
+            # N=6 -> dense_dp=24 not divisible by EP=16
+            ({1: 4, 2: 2}, 2, 16, "divisible by EP"),
+        ]
+        for sizes, pp, ep, pattern in invalid_cases:
+            schedule = _soft(
+                strategy=NodeGroupStrategy.EP_PP_DP,
+                sizes=sizes,
+                pp=pp,
+                ep=ep,
+            )
+            with self.assertRaisesRegex(ValueError, pattern):
+                validate_soft_group_topology(schedule)
+        # EP=12 passes dense_dp divisibility (48 % 12 == 0) but is not
+        # a multiple of R=8: an EP slot would not consist of whole nodes
+        schedule = _soft(
+            strategy=NodeGroupStrategy.EP_PP_DP,
+            sizes={1: 6, 2: 6},
+            pp=2,
+            ep=12,
+        )
+        with self.assertRaisesRegex(
+            ValueError, "EP=12 to be divisible by ranks_per_node"
+        ):
+            validate_soft_group_topology(schedule)
+        # declared N mismatches the sum of sizes
+        schedule = _soft(sizes={1: 4, 2: 4}, pp=2, ep=16, num_nodes=7)
+        with self.assertRaisesRegex(ValueError, "sum to 8"):
+            validate_soft_group_topology(schedule)
+
     def test_ep_pp_dp_layout_built_once(self):
         schedule = _soft(
             strategy=NodeGroupStrategy.EP_PP_DP,
