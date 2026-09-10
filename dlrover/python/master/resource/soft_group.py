@@ -207,12 +207,36 @@ def _ep_pp_dp_layout(schedule: SoftGroupSchedule) -> List[int]:
     """Compute (once per schedule) the full-world group sequence of the
     ``ep_pp_dp`` strategy: ``{rank_index: group_id}`` for ``k = 0..N-1``.
 
-    Each round takes one EP slot (``ep_workers`` consecutive pods) from
-    every non-exhausted group in ascending group-id order — "take
-    ep-size pods from a group, jump to the next group, and so on".
+    The layout packs whole EP slots into ep-pp COLUMNS. The world has
+    ``C = DP_nodes / ep_workers`` slot positions (columns); a column is
+    one slot position spanning ALL ``pp`` pipeline stages (``pp`` EP
+    slots, i.e. one Megatron PP column). Each column is filled by a
+    greedy: repeatedly take the group with the MOST remaining whole EP
+    slots (ties broken by the smallest group id) and place
+    ``min(remaining, column capacity)`` slots of it until the column is
+    full, then move to the next column.
+
+    Why the largest-remaining greedy (fragment-deferring FFD): a group
+    with at least ``pp`` remaining slots fills whole columns alone, so
+    its PP columns are intra-group — ZERO cross-segment PP hops. Only
+    residual fragments (``s_g % pp != 0`` leftover slots) share a
+    column with other fragments; one group switch inside a column is
+    exactly one cross-segment PP hop. Deferring fragments to the tail
+    lets them pair with each other, which reaches the theoretical
+    minimum number of mixed columns for nearly every input: the
+    odd-slot groups lower-bound the mixed columns and the greedy pairs
+    the residuals together ({3, 3, 2} with pp=2 packs as [aa][bb][cc][ab]
+    — one mixed column, while a descending chained fill pays two).
+
+    The column inventory is global (``pp * C * ep_workers`` slot-pods,
+    covered by ``sum(sizes)``), so unlike a per-stage rotation the
+    packing never starves a late stage: {g1: 6, g2: 2, g3: 2} with
+    pp=2 and 1-pod slots lays out fully, where a per-stage round robin
+    drains the small groups in stage 0 and cannot fill stage 1.
+
     Validation guarantees every size is a whole number of EP slots, so
-    the round robin consumes exactly all pods; the leftover sweep below
-    is a defensive fallback for schedules built bypassing validation.
+    the greedy covers exactly all pods; the crumb tail below is a
+    defensive fallback for schedules built bypassing validation.
     """
     with schedule._layout_lock:
         if schedule._ep_pp_dp_layout is not None:
@@ -220,36 +244,60 @@ def _ep_pp_dp_layout(schedule: SoftGroupSchedule) -> List[int]:
         sizes = schedule.sizes
         total = sum(sizes.values())
         slot = ep_group_workers(schedule)
-        remaining = {g: sizes[g] for g in sorted(sizes) if sizes[g] > 0}
+        slot = slot if slot > 0 else 1
+        # Whole EP slots remaining per group; sub-slot crumbs are kept
+        # apart for the defensive tail (empty for validated schedules).
+        remaining: Dict[int, int] = {}
+        crumbs: Dict[int, int] = {}
+        for group_id in sorted(sizes):
+            if sizes[group_id] > 0:
+                remaining[group_id] = sizes[group_id] // slot
+                crumbs[group_id] = sizes[group_id] % slot
+
+        model_parallel = schedule.tp * schedule.pp * schedule.cp
+        dp_nodes = total // model_parallel if model_parallel else total
+        # Number of slot positions per stage == the number of PP columns.
+        columns = dp_nodes // slot
+        pp = max(schedule.pp, 1)
+
+        # Greedy column packing: one column of pp slots at a time, every
+        # pick taking min(remaining of the largest group, capacity) slots.
+        col_slots: List[List[int]] = []
+        for _col in range(columns):
+            groups: List[int] = []
+            while len(groups) < pp and any(v > 0 for v in remaining.values()):
+                group_id = max(
+                    sorted(remaining.keys()),
+                    key=lambda k: (remaining[k], -k),
+                )
+                take = min(remaining[group_id], pp - len(groups))
+                groups.extend([group_id] * take)
+                remaining[group_id] -= take
+            col_slots.append(groups)
+
+        # Flatten the columns into the stage-major pod sequence: the
+        # s-th pipeline stage consumes the s-th slot of every column.
         layout: List[int] = []
+        for stage in range(pp):
+            for slot_groups in col_slots:
+                if stage < len(slot_groups):
+                    layout.extend([slot_groups[stage]] * slot)
 
-        # Round robin of whole EP slots: one slot per group per round.
-        progressed = True
-        while progressed:
-            progressed = False
-            for group_id in list(remaining.keys()):
-                if remaining[group_id] >= slot:
-                    layout.extend([group_id] * slot)
-                    remaining[group_id] -= slot
-                    progressed = True
-
-        # Defensive: complete with leftover pods, one per group per sweep.
-        # Unreachable for validated schedules (every size is a multiple
-        # of the EP slot).
-        if any(remaining.values()):
+        # Defensive crumb tail (bypassed validation only): append the
+        # sub-slot pods pod by pod in ascending group order.
+        missing = total - len(layout)
+        if missing > 0 and any(v > 0 for v in crumbs.values()):
             logger.warning(
-                "The ep_pp_dp soft group layout found leftover pods %s "
-                "outside whole EP slots (the schedule bypassed the EP "
-                "alignment validation); they are placed one per group per "
-                "sweep and their EP groups may straddle groups.",
-                {g: c for g, c in remaining.items() if c > 0},
+                "The ep_pp_dp soft group layout found %d sub-slot pod(s) "
+                "(the schedule bypassed the EP alignment validation); "
+                "they are appended pod by pod and their EP groups may "
+                "straddle.",
+                missing,
             )
-            while len(layout) < total and any(remaining.values()):
-                for group_id in list(remaining.keys()):
-                    if remaining[group_id] <= 0 or len(layout) >= total:
-                        continue
-                    layout.append(group_id)
-                    remaining[group_id] -= 1
+            for group_id in sorted(crumbs.keys()):
+                for _ in range(crumbs[group_id]):
+                    if len(layout) < total:
+                        layout.append(group_id)
 
         if len(layout) != total:
             raise ValueError(
