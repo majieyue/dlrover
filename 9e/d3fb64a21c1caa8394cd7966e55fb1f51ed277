@@ -1,0 +1,21 @@
+dlrover/python/master/node/dist_job_manager.py
+  s_04f11074d5f93a::t_7bdc908cf7c40d 1572-1579
+dlrover/python/tests/test_job_manager.py
+  s_04f11074d5f93a::t_61c2b239b41123 2753
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9ed3fb64a21c1caa8394cd7966e55fb1f51ed277",
+  "prompts": {},
+  "sessions": {
+    "s_04f11074d5f93a": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "478bbddc-ff66-4e5f-abf0-7a8b360b0bcb",
+        "model": "glink/Kimi-K3:glink_domestic"
+      },
+      "human_author": "Ma Jie Yue <jieyue.majy@antgroup.com>"
+    }
+  }
+}
