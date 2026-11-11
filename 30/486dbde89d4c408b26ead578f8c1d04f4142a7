@@ -1,0 +1,53 @@
+dlrover/python/tests/test_job_manager.py
+  s_04f11074d5f93a::t_ff31d7477e5630 2607-2752,2754-2837
+  s_04f11074d5f93a::t_61c2b239b41123 2753
+  s_04f11074d5f93a::t_626d81014b6669 52-61
+dlrover/python/master/watcher/k8s_watcher.py
+  s_04f11074d5f93a::t_946a3350c06d41 203-217
+dlrover/python/elastic_agent/torch/training.py
+  s_04f11074d5f93a::t_fe5bd27e44d69a 1214-1233
+dlrover/python/common/global_context.py
+  s_04f11074d5f93a::t_226c162daa25e1 166-175
+dlrover/python/elastic_agent/torch/urgent_save_listener.py
+  s_04f11074d5f93a::t_619b2bad0ac3bb 186-196,202-207
+  s_04f11074d5f93a::t_c90b86ddf09755 32-34
+  s_04f11074d5f93a::t_5b699b5726e869 77-81
+  s_04f11074d5f93a::t_d84bb873109f4a 152-153
+  s_04f11074d5f93a::t_c36f3c19bfb928 231-256
+dlrover/python/tests/test_urgent_save.py
+  s_04f11074d5f93a::t_37ef52bb8ee6e6 196,216-217,222,237,243,256-314
+  s_04f11074d5f93a::t_915f9064940409 169-170
+dlrover/python/master/node/dist_job_manager.py
+  s_04f11074d5f93a::t_7bdc908cf7c40d 1572-1579
+  s_04f11074d5f93a::t_b5c5ee7b8a9cb1 1155-1168
+  s_04f11074d5f93a::t_a96506cdd9aebf 1681-1682,1687-1688
+  s_04f11074d5f93a::t_217959252f7818 112-114
+  s_04f11074d5f93a::t_f315564d589609 1676
+  s_04f11074d5f93a::t_6eabc05f40ae98 42-50
+  s_04f11074d5f93a::t_60f641dca34adc 1543-1571,1580-1660,1662-1675,1677-1680,1683-1686,1689-1739
+  s_04f11074d5f93a::t_0647c1d868392e 1661
+  s_04f11074d5f93a::t_54de7dab111fa2 247-257
+dlrover/python/tests/test_k8s_watcher.py
+  s_04f11074d5f93a::t_0227708c95d7c4 353-373
+dlrover/python/common/node.py
+  s_04f11074d5f93a::t_e125bc19cc2b7e 239-242
+  s_04f11074d5f93a::t_9fd7e7b5a00ba9 314
+dlrover/python/common/constants.py
+  s_04f11074d5f93a::t_78a636931df7ed 144-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "30486dbde89d4c408b26ead578f8c1d04f4142a7",
+  "prompts": {},
+  "sessions": {
+    "s_04f11074d5f93a": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "478bbddc-ff66-4e5f-abf0-7a8b360b0bcb",
+        "model": "glink/Kimi-K3:glink_domestic"
+      },
+      "human_author": "Ma Jie Yue <jieyue.majy@antgroup.com>"
+    }
+  }
+}
