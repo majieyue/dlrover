@@ -1,0 +1,28 @@
+dlrover/python/master/elastic_training/topology_rerank.py
+  s_8f624ecb4b5dea::t_97192a24cb8b54 208-209,213-218,224
+  s_8f624ecb4b5dea::t_3dbd4a9ac1017e 163-169,176-178
+  s_8f624ecb4b5dea::t_a8490d4bfbb764 219-223,225-232
+  s_8f624ecb4b5dea::t_f6e660eb71a93d 170-175
+dlrover/python/tests/test_topology_rerank.py
+  s_8f624ecb4b5dea::t_6fd4544b180765 248-254,256-261
+  s_8f624ecb4b5dea::t_531545e65ad90e 234-236,243-247,264
+  s_8f624ecb4b5dea::t_79eec4f9ff1897 270,272-273,275-277,279-282,284-288,290
+  s_8f624ecb4b5dea::t_ca4db0d9d03859 271,274,278,283,289,291
+  s_8f624ecb4b5dea::t_d45acfcd7c150c 220-233,237-242,255,262-263,265-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bd79547372829d85e2242736a2a6909513cedf3c",
+  "prompts": {},
+  "sessions": {
+    "s_8f624ecb4b5dea": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "06d33a3f-fcf9-49aa-988e-c0919efccca2",
+        "model": "antchat/GLM-5.3-Flash"
+      },
+      "human_author": null
+    }
+  }
+}
