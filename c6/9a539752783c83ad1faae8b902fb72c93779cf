@@ -1,0 +1,30 @@
+dlrover/python/master/node/dist_job_manager.py
+  s_8f624ecb4b5dea::t_6111928dba3998 373-378,385,432-434,440-449
+  s_8f624ecb4b5dea::t_a7595a52f52a91 379-383,435-439
+  s_8f624ecb4b5dea::t_fc1bcd2718a431 314-323,325-333,337,347
+  s_8f624ecb4b5dea::t_93ea16de68aba6 366-371
+dlrover/python/master/resource/job.py
+  s_8f624ecb4b5dea::t_873d5d4a0a3572 169-172,174-180
+dlrover/python/master/args.py
+  s_8f624ecb4b5dea::t_47e78e1fb209f6 262-266
+  s_8f624ecb4b5dea::t_814962dfe8b3fd 154-158,165-175,192-194,202-204,216-217
+dlrover/python/tests/test_job_manager.py
+  s_8f624ecb4b5dea::t_a80251928d2bbb 391-395,397-454,456-464
+  s_8f624ecb4b5dea::t_a98c1bec258dff 825-829,842,844
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c69a539752783c83ad1faae8b902fb72c93779cf",
+  "prompts": {},
+  "sessions": {
+    "s_8f624ecb4b5dea": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "06d33a3f-fcf9-49aa-988e-c0919efccca2",
+        "model": "antchat/GLM-5.3-Flash"
+      },
+      "human_author": "Ma Jie Yue <jieyue.majy@antgroup.com>"
+    }
+  }
+}
