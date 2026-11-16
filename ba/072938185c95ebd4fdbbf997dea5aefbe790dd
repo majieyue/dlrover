@@ -1,0 +1,26 @@
+dlrover/python/tests/test_topology_rerank.py
+  s_8f624ecb4b5dea::t_d45acfcd7c150c 220-233,237-242,255,262-263,265-269
+  s_8f624ecb4b5dea::t_531545e65ad90e 234-236,243-247,264
+  s_8f624ecb4b5dea::t_6fd4544b180765 248-254,256-261
+dlrover/python/master/elastic_training/topology_rerank.py
+  s_8f624ecb4b5dea::t_bac4d2852273c4 238
+  s_8f624ecb4b5dea::t_3dbd4a9ac1017e 163-180
+  s_8f624ecb4b5dea::t_97192a24cb8b54 210-211,215-232,236,239-240
+  s_8f624ecb4b5dea::t_2b55f7c677c32c 233-235,237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ba072938185c95ebd4fdbbf997dea5aefbe790dd",
+  "prompts": {},
+  "sessions": {
+    "s_8f624ecb4b5dea": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "06d33a3f-fcf9-49aa-988e-c0919efccca2",
+        "model": "antchat/GLM-5.3-Flash"
+      },
+      "human_author": "Ma Jie Yue <jieyue.majy@antgroup.com>"
+    }
+  }
+}
