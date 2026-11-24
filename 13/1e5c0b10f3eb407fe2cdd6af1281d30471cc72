@@ -1,0 +1,49 @@
+dlrover/python/diagnosis/diagnostician/training_hang.py
+  s_e492f22b47c528::t_992a0a7cc4d829 74-77
+  s_e492f22b47c528::t_2ce2bf0a1e9dbb 102
+  s_e492f22b47c528::t_a27f9e41ef4a88 131-157
+dlrover/python/tests/test_elastic_training_agent.py
+  s_e492f22b47c528::t_64f7e48f36fc79 620-681
+dlrover/python/master/args.py
+  s_e492f22b47c528::t_069d122ce57d97 22
+  s_e492f22b47c528::t_09d626022cae8d 95-103
+  s_e492f22b47c528::t_8527991e14ca68 94
+dlrover/python/tests/test_diagnostician.py
+  s_e492f22b47c528::t_3356668595c700 606
+  s_e492f22b47c528::t_5f8e81c01842ec 674,677-737
+  s_e492f22b47c528::t_8d409462899d49 671-673
+  s_e492f22b47c528::t_5cb72d23aa678d 675-676
+dlrover/python/master/main.py
+  s_e492f22b47c528::t_4a3117032ce0e4 57
+dlrover/python/common/env_utils.py
+  s_e492f22b47c528::t_d6f8f82fc526ba 238-298
+dlrover/python/common/global_context.py
+  s_e492f22b47c528::t_111f12a29adef4 148-150
+dlrover/python/diagnosis/common/constants.py
+  s_e492f22b47c528::t_85d1d65ae8ffe2 91
+  s_e492f22b47c528::t_227c8d3ef6ecff 46-49
+dlrover/python/elastic_agent/torch/training.py
+  s_e492f22b47c528::t_d9957f127373ff 1971-2028
+  s_e492f22b47c528::t_ae1782ce070045 1573-1574
+dlrover/python/tests/test_env_utils.py
+  s_e492f22b47c528::t_c30458c01817fa 162
+  s_e492f22b47c528::t_55aca71c21f5a3 149-161,163-201
+dlrover/python/tests/test_args.py
+  s_e492f22b47c528::t_e871dd1de418f4 73-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "131e5c0b10f3eb407fe2cdd6af1281d30471cc72",
+  "prompts": {},
+  "sessions": {
+    "s_e492f22b47c528": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "ad2c0f23-114b-4fe8-808e-b67965c03d8f",
+        "model": "antchat/GLM-5.3-Flash"
+      },
+      "human_author": "Ma Jie Yue <jieyue.majy@antgroup.com>"
+    }
+  }
+}
